@@ -62,9 +62,9 @@ flowchart TD
     Runtime -->|Goal / Team| OtherModeAnswer --> Chat
 ```
 
-# daily_stock_analysis 的 PDF 知识库 RAG 流程
+# PDF 知识库 RAG 流程
 
-本文按 `daily_stock_analysis` 当前工作区中的实现梳理，记录的是代码实际流程，不是对部署或端到端运行状态的验收结论。
+本文梳理 PDF 知识库 RAG 的实际流程，不是对部署或端到端运行状态的验收结论。
 
 ## 先看清三个数据放在哪里
 
