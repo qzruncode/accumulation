@@ -11,6 +11,7 @@
 | [BM25：基于关键词的相关性排序](rag/bm25.md) | BM25 公式与参数、关键词检索、与向量检索的互补关系，以及在混合 RAG 中的使用与验证。 |
 | [Dense：基于语义向量的检索](rag/dense.md) | Embedding 向量如何用于语义召回、相似度度量、工程边界，以及与 BM25 的配合。 |
 | [RRF：把多路检索结果合成一份排序](rag/rrf.md) | RRF 的排名融合原理、手算示例、与 Reranker 的区别及调试方法。 |
+| [PDF 知识库 RAG 流程架构](rag/design.md) | `daily_stock_analysis` 的上传、索引、混合检索流程，以及 Direct/Plan、Goal、Team 模式的差异和证据校验边界。 |
 
 ## 笔记约定
 
