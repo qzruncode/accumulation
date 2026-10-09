@@ -25,6 +25,12 @@
 | [Agent 运行记录与监控](agent/run-observability.md) | 概率执行的事实记录、调用与证据追踪、诊断边界、资源指标、恢复和改进闭环。 |
 | [Agent 网页搜索与读取](agent/web-search-and-read.md) | 搜索来源切换、动态网页获取、正文提取、文档转换、结果合同与核查清单。 |
 
+### Web Security
+
+| 笔记 | 内容 |
+| --- | --- |
+| [浏览器 Agent 操作防护：BOSS 页面反调试复盘](web-security/browser-agent-defense-case-study.md) | 双入口反调试定位、初始化前替换、真实验证边界，以及自建页面的服务端授权、操作确认、限流与恢复设计。 |
+
 ## 笔记约定
 
 - 先解释解决什么问题，再说明原理和关键参数。
