@@ -1,104 +1,258 @@
-# 浏览器 Agent 操作防护：反调试原理与防护设计
+# 网页反调试：BOSS 的做法、绕过过程与项目接入示例
 
-**前端反调试能干扰部分自动化，但能被绕过。要防止越权、误删和批量操作，必须在服务端限制权限和行为。**
+BOSS 页面在浏览器调试时反复刷新。查到两套独立检测后，在它们初始化前替换入口，页面恢复正常。下面给出对应代码和自己项目的接入方式。
 
-## 1. 页面为什么会反复刷新
+## 1. BOSS 怎么做的
 
-BOSS 页面中有两套独立检测：一套在 SPA 模块里，另一套在公共脚本里。它们通过浏览器调试时的行为差异判断是否开启调试，命中后刷新或隐藏页面。
-
-| 检测方式 | 原理 | 问题 |
+| 位置 | 检测入口 | 行为 |
 | --- | --- | --- |
-| DOM 属性 getter | 调试工具展示对象时，可能读取特定属性 | 不能据此判断操作是否恶意 |
-| Date / Function 的 `toString` | 检查对象展示时的方法调用 | 行为受浏览器和调试方式影响 |
-| 控制台输出耗时 | 比较输出不同对象的时间差 | 性能波动可能造成误判 |
-| 原生方法检查 | 检查方法是否被替换 | 检测入口本身也可能被替换 |
+| SPA 的 webpack 模块 | `noDebug()` | 创建检测器，定时检查 DOM getter、Date/Function 的 `toString` 和控制台输出耗时 |
+| 公共脚本 | `Sign.encryptPwd()` | 独立创建另一套检测器；方法名像加密，但实际方法体包含反调试逻辑 |
+| 检测命中后的处理 | 检测器回调 | 刷新、关闭窗口、清空或隐藏页面 |
 
-这些方法检测的是调试行为，不能准确判断“是不是 AI”或“是否经过用户授权”。
+### 检测代码长什么样
 
-## 2. 这次怎么解决
+下面是从实际逻辑提炼的示例，省略混淆代码及其他检测器，不是原脚本全文：
 
-先抓刷新来源，再在检测初始化前替换入口。替代函数保留正常业务需要的回调和返回值，跳过检测器创建。
+```js
+class DateDetector {
+  constructor(onDetected) {
+    this.count = 0;
+    this.date = new Date();
+    this.onDetected = onDetected;
+    this.date.toString = () => {
+      this.count += 1;
+      return '';
+    };
+  }
 
-| 步骤 | 做法 | 目的 |
-| --- | --- | --- |
-| 找到刷新来源 | 读取浏览器导航事件及调用栈，检查对应脚本 | 区分脚本刷新、路由跳转和连接故障 |
-| 提前注入 | 扩展使用 `document_start` 和 `MAIN` | 在页面脚本启动前进入同一执行环境 |
-| 处理 SPA 检测 | 拦截 webpack 模块注册，核对源码特征后替换目标工厂 | 阻止检测器初始化，保留其他模块 |
-| 处理公共脚本检测 | 拦截全局对象赋值，核对并替换其中的检测方法 | 处理 webpack 之外的独立入口 |
-| 保留业务行为 | 保留参数校验、初始化回调和返回结构 | 避免页面功能随检测一起失效 |
-| 验证结果 | 分别检查各入口，再操作页面并刷新回读 | 确认检测跳过且业务能保存 |
+  check() {
+    this.count = 0;
+    console.log(this.date);
+    if (this.count >= 2) this.onDetected();
+  }
+}
 
-关键点：
-
-- **必须足够早。** 检测运行后可能已经创建定时任务或触发导航，事后替换函数无法撤销这些动作。
-- **必须找全入口。** 处理一套检测后仍刷新，应继续查调用栈，而不是重复修改同一处。
-- **必须核对方法体。** 不能仅凭函数名判断它是检测逻辑还是业务逻辑。
-- **必须实际操作验证。** “模块已替换”不等于“替代函数已调用”，更不等于“页面功能正常”。
-
-本次处理两套入口后，观察期间未再出现自动刷新，预览、保存和刷新回读正常。这个结果只适用于当时测试的页面；网站改版后需要重新核验。
-
-## 3. 为什么这种防护能被绕过
-
-页面 JavaScript 在用户的浏览器中运行。有权限的扩展可以进入页面执行环境，在检测启动前替换函数。检测代码再复杂，也不能代替服务端权限检查。
-
-| 做法 | 能解决什么 | 不能保证什么 |
-| --- | --- | --- |
-| 反调试、混淆 | 增加分析和自动化成本 | 阻止有浏览器控制权限的操作者 |
-| `navigator.webdriver`、行为评分 | 提供自动化风险信号 | 准确判断恶意和用户授权 |
-| `event.isTrusted` | 提供事件来源信息 | 证明操作来自人的真实意愿 |
-| 隐藏按钮、前端禁用 | 限制普通界面操作 | 阻止直接请求接口 |
-| 同页确认弹窗 | 提醒用户检查操作 | 阻止能控制页面的 Agent 点击确认 |
-| CSP | 减轻部分脚本注入风险 | 阻止所有扩展或浏览器控制方式 |
-
-## 4. 自己开发页面时怎么防护
-
-先定义禁止的行为：越权读写、过量导出、批量删除、未经确认的发布。不要只判断操作方是不是 Agent。
-
-| 需求 | 实现方式 |
-| --- | --- |
-| 防越权 | 每个接口检查用户、租户、对象归属和操作权限 |
-| 防批量滥用 | 按账号、租户、资源和操作类型设置限流与配额 |
-| 防误删、误发布 | 展示具体对象和修改差异；关键操作要求确认 |
-| 防确认后换参数 | 服务端确认凭证绑定用户、动作、对象、版本和参数摘要，短期有效、一次使用 |
-| 防浏览器被控制 | 高风险操作使用独立确认渠道；同页弹窗不足以保护此场景 |
-| 防跨站伪造请求 | Cookie 会话写接口使用 CSRF 防护；它不能阻止已控制同源页面的 Agent |
-| 防验证码结果伪造 | 在服务端验证挑战结果；验证通过仍要检查业务权限 |
-| 限制授权 Agent | 给独立身份，限定资源、操作、有效期和配额 |
-| 降低错误损失 | 软删除、版本历史、撤销机制和操作审计 |
-
-```mermaid
-flowchart LR
-    A[操作请求] --> B[服务端权限检查]
-    B --> C[限流与风险检查]
-    C --> D[必要时确认具体操作]
-    D --> E[再次校验权限与确认凭证]
-    E --> F[执行并记录 支持恢复]
+const detector = new DateDetector(onDetected);
+const timer = setInterval(() => detector.check(), 500);
+// 页面退出时：clearInterval(timer)
 ```
 
-前端检测只作为辅助信号。关闭或替换前端检测后，服务端仍应拒绝未授权操作。不要用循环刷新、清空页面或耗尽内存作为默认处理方式，这会伤害正常用户，却不能建立权限边界。
+调试工具展示对象时，可能额外调用 `toString()`。检测器利用这个差异计数。Function 检测采用类似方法；DOM 检测则给元素属性设置 getter，观察它是否被读取。
 
-## 5. 验收清单
+**不是所有浏览器或调试方式都会触发这个示例，也可能误判。** BOSS 使用多个检测器组合，而不是只靠一个 Date 对象。
 
-| 测试 | 预期结果 |
+## 2. 我怎么解决的
+
+### 先找到谁在刷新
+
+通过浏览器调试协议观察 `Page.frameRequestedNavigation`，再读取 Document 请求的 `Network.requestWillBeSent`：
+
+```js
+// 已连接、已启用 Page 和 Network 的调试客户端
+client.on('Network.requestWillBeSent', event => {
+  if (event.type !== 'Document') return;
+  if (event.initiator.type !== 'script') return;
+  console.log(event.initiator.stack?.callFrames);
+});
+```
+
+调用栈给出了发起导航的脚本和位置。处理 SPA 的检测后仍然刷新，继续读取调用栈，才找到公共脚本里的第二套检测。
+
+### 在检测初始化前替换入口
+
+扩展的关键配置：
+
+```json
+{
+  "manifest_version": 3,
+  "name": "页面检测调试补丁",
+  "version": "1",
+  "content_scripts": [{
+    "matches": ["https://your-site.example/*"],
+    "js": ["guard.js"],
+    "run_at": "document_start",
+    "world": "MAIN"
+  }]
+}
+```
+
+`document_start` 让补丁提前运行；`MAIN` 让补丁进入页面自身的 JavaScript 环境。上面的域名是占位符，使用时换成自己的测试站点。
+
+实际扩展通过源码特征确认目标，分别处理两个入口：
+
+| 入口 | 拦截位置 | 替换内容 |
+| --- | --- | --- |
+| webpack 模块 | chunk 队列的 `push`，模块交给 runtime 之前 | 目标模块工厂 |
+| 公共脚本 | `window.Sign` 被赋值时 | 已确认的 `encryptPwd` 检测方法 |
+
+webpack 模块替换的核心如下。`modules` 是 chunk 中的模块表，`targetId` 是已经核验的目标编号：
+
+```js
+function replaceDetector(modules, targetId, matchesSource) {
+  const original = modules[targetId];
+  if (typeof original !== 'function') return false;
+  if (!matchesSource(Function.prototype.toString.call(original))) {
+    return false;
+  }
+
+  modules[targetId] = function (module, exports, require) {
+    require.r(exports);
+    require.d(exports, { noDebug: () => noDebug });
+  };
+  return true;
+}
+
+function noDebug(options, initialize) {
+  if (!options?.appName) throw new Error('Unable to obtain information');
+  try { initialize?.(); } catch { /* 原入口也捕获初始化异常 */ }
+  return { success: true, reason: '', check: () => true };
+}
+```
+
+这段只展示替换工厂，不能单独当成完整扩展。实际实现还拦截 chunk 全局变量的赋值、webpack 对队列 `push` 的重设，并转交其他模块和 runtime 回调。源码匹配检查包括导出结构、Date/Function 检测及事件标记；不能只看模块编号就替换。
+
+公共脚本的替代方法保留了页面初始化回调：
+
+```js
+// 仅在方法源码核验通过、原方法尚未执行时替换
+sign.encryptPwd = function () {
+  try {
+    window.Detail?.initDg();
+  } catch { /* 保留原方法捕获回调异常的行为 */ }
+};
+```
+
+不能简单换成空函数：`Detail.initDg()` 会设置后续业务检查需要的状态。其他登录加密方法没有被改动。
+
+### 验证时检查什么
+
+| 检查 | 本次结果 |
 | --- | --- |
-| 关闭前端检测、直接请求接口 | 未授权操作仍被拒绝 |
-| 修改对象 ID 或租户 ID | 无法访问其他用户的数据 |
-| 伪造客户端“非 Agent”标记 | 无法获得额外权限 |
-| 确认后换对象、扩大范围或修改参数 | 必须重新确认 |
-| 使用过期、重复或跨账号的确认凭证 | 请求被拒绝 |
-| 重试同一写操作 | 不重复执行；幂等键不能代替授权 |
-| 高并发、批量导出 | 受到配额限制 |
-| 使用开发者工具、慢设备或辅助工具 | 不无限刷新，不丢失编辑内容 |
-| 删除或发布出错 | 能按设计恢复或撤销，审计记录完整 |
+| 两个替代入口是否实际调用 | 都已调用 |
+| 页面是否仍主动刷新 | 观察期间没有 |
+| 预览、编辑、保存是否正常 | 正常 |
+| 刷新后内容是否保留 | 回读成功 |
 
-这些是自建应用的待测项，不代表本次已经验证了服务端防护。
+必须在页面初始化前拦截。webpack 已注册模块后，再修改旧 chunk 队列，不能撤销已运行的检测。
 
-## 参考资料
+## 3. 怎么复用到自己的项目
+
+如果要实现同类前端检测，可以直接接入 `disable-devtool`。它支持上述 DOM、Date、Function 等探针；这里采用相同机制，不表示 BOSS 一定使用了这个库。
+
+下面以现有 Vite 项目为例：检测命中后暂停页面提交并显示提示，关闭调试工具后恢复。保留用户输入，避免刷新循环。
+
+### 安装
+
+```sh
+npm install disable-devtool
+```
+
+### 新增 `src/devtool-guard.js`
+
+```js
+import DisableDevtool from 'disable-devtool';
+
+let blocked = false;
+export const isPageBlocked = () => blocked;
+
+function setBlocked(value) {
+  blocked = value;
+  window.dispatchEvent(new CustomEvent('devtool-state', {
+    detail: { blocked: value }
+  }));
+}
+
+export function startDevtoolGuard() {
+  if (!import.meta.env.PROD) return; // 开发环境保留正常调试
+
+  const result = DisableDevtool({
+    detectors: [1, 3, 4], // DOM getter、Date、Function
+    interval: 500,
+    disableMenu: false,
+    disableSelect: false,
+    disableCopy: false,
+    disableCut: false,
+    disablePaste: false,
+    clearLog: false,
+    ondevtoolopen() { setBlocked(true); },
+    ondevtoolclose() { setBlocked(false); }
+  });
+
+  if (!result.success) console.warn(result.reason);
+}
+```
+
+使用自定义 `ondevtoolopen`，不调用库提供的关闭窗口动作。探针编号与参数含义见[库的配置说明](https://github.com/theajack/disable-devtool#312-parameters)。
+
+### 在入口初始化，然后加载业务
+
+```js
+// src/main.js
+import { startDevtoolGuard } from './devtool-guard.js';
+
+startDevtoolGuard();
+await import('./app.js');
+```
+
+把初始化放在入口，覆盖 SPA 的所有路由。不要在每个页面组件中重复启动检测。
+
+### 在业务提交处接入
+
+页面已有表单时，增加提示和提交检查：
+
+```html
+<p id="debug-warning" role="alert" hidden>
+  检测到调试环境，已暂停提交。请关闭调试工具后重试。
+</p>
+<form id="editor">
+  <textarea name="content"></textarea>
+  <button type="submit">保存</button>
+</form>
+```
+
+```js
+// src/app.js
+import { isPageBlocked } from './devtool-guard.js';
+
+const form = document.querySelector('#editor');
+const warning = document.querySelector('#debug-warning');
+const button = form.querySelector('button[type="submit"]');
+
+function updateState() {
+  warning.hidden = !isPageBlocked();
+  button.disabled = isPageBlocked();
+}
+window.addEventListener('devtool-state', updateState);
+updateState(); // 初始化前已触发检测时，也能读到当前状态
+
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (isPageBlocked()) return;
+  // 在这里调用项目原有的保存方法
+});
+```
+
+React/Vue 项目用组件状态控制提示和按钮，提交函数同样检查 `isPageBlocked()`；机制不变。
+
+### 测试
+
+```sh
+npm run build
+npm run preview
+```
+
+| 操作 | 要检查的结果 |
+| --- | --- |
+| 不开调试工具 | 能编辑和提交 |
+| 打开调试工具并触发探针 | 显示提示，提交被暂停 |
+| 关闭调试工具 | 能恢复提交，输入内容保留 |
+| 切换 SPA 路由 | 检测仍在运行，没有重复初始化 |
+| 慢设备、不同浏览器、辅助工具 | 是否误判；据结果调整启用的探针 |
+
+接入代码是示例，未在你的项目中运行验收。它阻挡的是部分依赖调试工具的操作，不能可靠识别恶意 AI；本次插件就说明，这类前端入口仍能被提前替换。
+
+## 参考
 
 - [Chrome content scripts：注入时间与执行环境](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts)
-- [disable-devtool：反调试检测方式](https://github.com/theajack/disable-devtool#35-monitoring-mode)
-- [OWASP：服务端授权](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
-- [OWASP：操作确认与授权凭证](https://cheatsheetseries.owasp.org/cheatsheets/Transaction_Authorization_Cheat_Sheet.html)
-- [OWASP：CSRF 防护](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
-- [OWASP：CSP](https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html)
-- [Turnstile：服务端验证](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)
+- [disable-devtool：用法、回调与检测类型](https://github.com/theajack/disable-devtool)

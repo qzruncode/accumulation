@@ -29,7 +29,7 @@
 
 | 笔记 | 内容 |
 | --- | --- |
-| [浏览器 Agent 操作防护：反调试原理与防护设计](web-security/browser-agent-defense-case-study.md) | 反调试如何被绕过，以及服务端授权、操作确认、限流与恢复办法。 |
+| [网页反调试：BOSS 的做法与项目接入示例](web-security/browser-agent-defense-case-study.md) | 检测代码、双入口替换过程，以及 disable-devtool 的项目接入代码与测试步骤。 |
 
 ## 笔记约定
 
