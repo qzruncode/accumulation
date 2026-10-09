@@ -29,7 +29,7 @@
 
 | 笔记 | 内容 |
 | --- | --- |
-| [浏览器 Agent 操作防护：BOSS 页面反调试复盘](web-security/browser-agent-defense-case-study.md) | 双入口反调试定位、初始化前替换、真实验证边界，以及自建页面的服务端授权、操作确认、限流与恢复设计。 |
+| [浏览器 Agent 操作防护：反调试原理与防护设计](web-security/browser-agent-defense-case-study.md) | 反调试如何被绕过，以及服务端授权、操作确认、限流与恢复办法。 |
 
 ## 笔记约定
 
