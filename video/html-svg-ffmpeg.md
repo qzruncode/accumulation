@@ -10,10 +10,10 @@ HTML 本身不是视频文件。HTML/SVG 描述画面和动画；浏览器按时
 
 ```mermaid
 flowchart LR
-    A[HTML + SVG<br/>绘制小狗] --> B[renderAt(t)<br/>按时间确定动画状态]
-    B --> C[浏览器逐帧截图<br/>96 张 1280×720 PNG]
-    C --> D[FFmpeg<br/>H.264 编码]
-    D --> E[4 秒 MP4<br/>24 fps]
+    A["HTML + SVG，绘制小狗"] --> B["JavaScript 按时间计算动画"]
+    B --> C["浏览器逐帧截图，96 张 PNG"]
+    C --> D["FFmpeg 编码 H.264"]
+    D --> E["MP4 视频，4 秒 / 24 fps"]
 ```
 
 可将职责理解为：
