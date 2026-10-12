@@ -35,7 +35,7 @@
 
 | 笔记 | 内容 |
 | --- | --- |
-| [用 HTML/SVG 和 FFmpeg 生成视频](video/html-svg-ffmpeg.md) | SVG 动画、浏览器确定性逐帧截图、FFmpeg 编码 MP4 的完整实测流程与验证结果。 |
+| [用 HTML/SVG 和 FFmpeg 制作视频](video/html-svg-ffmpeg.md) | 用网页绘制动画、浏览器渲染图像帧，再由 FFmpeg 编码为 MP4。 |
 
 ### Web Security
 
