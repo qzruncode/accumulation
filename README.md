@@ -31,6 +31,12 @@
 | --- | --- |
 | [RTK：压缩命令输出，降低 Agent 上下文噪声](agent-plugins/rtk-command-output-optimization.md) | RTK 命令改写、Codex 全局钩子、输出过滤、实测收益与适用边界。 |
 
+### 视频制作
+
+| 笔记 | 内容 |
+| --- | --- |
+| [用 HTML/SVG 和 FFmpeg 生成视频](video/html-svg-ffmpeg.md) | SVG 动画、浏览器确定性逐帧截图、FFmpeg 编码 MP4 的完整实测流程与验证结果。 |
+
 ### Web Security
 
 | 笔记 | 内容 |
