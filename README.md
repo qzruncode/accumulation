@@ -24,6 +24,7 @@
 | [会话展示投影：有序、可信、可回放的对话](agent/conversation-projection.md) | 进度与答案提交、片段身份、原生顺序、并行归属、终态快照与刷新恢复。 |
 | [Agent 运行记录与监控](agent/run-observability.md) | 概率执行的事实记录、调用与证据追踪、诊断边界、资源指标、恢复和改进闭环。 |
 | [Agent 网页搜索与读取](agent/web-search-and-read.md) | 搜索来源切换、动态网页获取、正文提取、文档转换、结果合同与核查清单。 |
+| [RTK：压缩命令输出，降低 Agent 上下文噪声](agent/rtk-command-output-optimization.md) | RTK 命令改写、Codex 全局钩子、输出过滤、实测收益与适用边界。 |
 
 ### Web Security
 
